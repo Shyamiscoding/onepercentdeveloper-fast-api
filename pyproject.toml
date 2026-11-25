@@ -1,0 +1,36 @@
+# OnePercent — FastAPI in Kannada: ONE project for the whole course.
+# Run `uv sync` once in this folder and every part's code just works.
+# When a new part is added, run `uv sync` again to pick up its packages.
+[project]
+name = "onepercent-fastapi-code"
+version = "0.1.0"
+description = "Runnable code for the OnePercent 'FastAPI in Kannada' course, part by part"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    # Part 01-02 — the framework, the server (uvicorn) and httpx all come with [standard]
+    "fastapi[standard]>=0.162.0",
+    # Part 03 — Settings from .env
+    "pydantic-settings>=2.16.2",
+]
+
+# One Ruff config for the whole course — every part (01-09) formats and lints the same way.
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+# F = pyflakes, E/W = pycodestyle, I = import sorting, UP = pyupgrade, B = bugbear
+select = ["E", "W", "F", "I", "UP", "B"]
+# The formatter owns line length (it wraps long CODE automatically on save).
+# E501 only nags about lines the formatter can't split — comments and long
+# strings — which have no autofix, so we let it go instead of showing a red error.
+ignore = ["E501"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.17.6",
+]

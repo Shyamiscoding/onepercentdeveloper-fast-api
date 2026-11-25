@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[oc]
+.venv/
+
+# secrets — commit .env.example, never .env
+.env
+
+# databases the stages create
+*.db
+*.db-journal
+
+# test output
+.pytest_cache/
+.coverage
+htmlcov/
+
+.DS_Store

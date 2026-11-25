@@ -1,0 +1,241 @@
+{
+  "info": {
+    "name": "OnePercent FastAPI — Part 03 (Open the Hood)",
+    "description": "API requests for the Part 03 stages that expose HTTP endpoints.\n\nNOTE: the odd-numbered stages (1, 3, 5, 7) are TERMINAL SCRIPTS, not APIs — run them with `uv run python stages/stage_X_....py`. Only the even stages (2, 4, 6, 8) are FastAPI apps, so only they appear here.\n\nEach app runs on the same host/port (http://127.0.0.1:8000), ONE AT A TIME. Start the server for the folder you want (the run command is in each folder's description), then fire its requests.\n\nStages 6 and 8 call a live 3rd-party rate API, so they need a `.env` with a real RATE_API_KEY (`cp .env.example .env`).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:8000",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Stage 2 — Annotated",
+      "description": "Run: uv run uvicorn stages.stage_2_annotated:app --reload",
+      "item": [
+        {
+          "name": "List rates (query via Annotated)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/rates?limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["rates"],
+              "query": [
+                { "key": "limit", "value": "10", "description": "1..100 (Annotated[int, Query(ge=1, le=100)])" }
+              ]
+            },
+            "description": "Returns the rates dict, capped to `limit`."
+          }
+        },
+        {
+          "name": "Convert — valid (GET query)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/convert?amount=8300&to=USD",
+              "host": ["{{baseUrl}}"],
+              "path": ["convert"],
+              "query": [
+                { "key": "amount", "value": "8300", "description": "must be > 0" },
+                { "key": "to", "value": "USD", "description": "USD | EUR | GBP" }
+              ]
+            },
+            "description": "Expect 200 with converted amount."
+          }
+        },
+        {
+          "name": "Convert — invalid amount (expect 422)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/convert?amount=-5&to=USD",
+              "host": ["{{baseUrl}}"],
+              "path": ["convert"],
+              "query": [
+                { "key": "amount", "value": "-5", "description": "fails gt=0 -> 422" },
+                { "key": "to", "value": "USD" }
+              ]
+            },
+            "description": "amount=-5 violates gt=0, so FastAPI returns 422."
+          }
+        },
+        {
+          "name": "Convert — POST (body reuses AmountInr rule)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 8300,\n  \"to\": \"USD\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/convert",
+              "host": ["{{baseUrl}}"],
+              "path": ["convert"]
+            },
+            "description": "Same conversion via a JSON body (ConversionRequest model)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Stage 4 — validators / computed / serializer",
+      "description": "Run: uv run uvicorn stages.stage_4_validators_computed:app --reload",
+      "item": [
+        {
+          "name": "Create rate — lowercase code gets uppercased",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"usd\",\n  \"inr_per_unit\": 90\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/rates",
+              "host": ["{{baseUrl}}"],
+              "path": ["rates"]
+            },
+            "description": "@field_validator upper_code uppercases 'usd' -> stored/returned as 'USD'. Expect 201."
+          }
+        },
+        {
+          "name": "Create rate — bad code (expect 422)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"us\",\n  \"inr_per_unit\": 90\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/rates",
+              "host": ["{{baseUrl}}"],
+              "path": ["rates"]
+            },
+            "description": "'us' -> 'US' (2 chars) fails min_length=3 / pattern ^[A-Z]{3}$ -> 422."
+          }
+        },
+        {
+          "name": "Convert — computed summary + 2dp converted",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 8300,\n  \"to\": \"USD\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/convert",
+              "host": ["{{baseUrl}}"],
+              "path": ["convert"]
+            },
+            "description": "Response shows @computed_field `summary` and `converted` serialized to 2 decimals."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Stage 6 — settings + live rate",
+      "description": "Run: uv run uvicorn stages.stage_6_settings:app --reload\nNeeds a .env with a real RATE_API_KEY (cp .env.example .env).",
+      "item": [
+        {
+          "name": "Show settings (non-secret config)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/settings",
+              "host": ["{{baseUrl}}"],
+              "path": ["settings"]
+            },
+            "description": "Returns app_name, debug, rate_api_url from validated settings."
+          }
+        },
+        {
+          "name": "Live rate (calls 3rd-party API)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/rates/live?to=USD",
+              "host": ["{{baseUrl}}"],
+              "path": ["rates", "live"],
+              "query": [
+                { "key": "to", "value": "USD", "description": "USD | EUR | GBP" }
+              ]
+            },
+            "description": "Uses settings.rate_api_url + rate_api_key. Returns 502 if the provider/key is unavailable."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Stage 8 — async vs sync (the footgun)",
+      "description": "Run: uv run uvicorn stages.stage_8_async_vs_sync:app --reload\n/rates/live needs the same .env as Stage 6.\n\nDemo: hit 'Bad blocking' in one tab, then immediately 'Rates report' in another — report hangs the full 3s because the event loop is frozen.",
+      "item": [
+        {
+          "name": "Live rate (async + await — correct for I/O)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/rates/live?to=USD",
+              "host": ["{{baseUrl}}"],
+              "path": ["rates", "live"],
+              "query": [
+                { "key": "to", "value": "USD" }
+              ]
+            },
+            "description": "async def + await httpx — the right shape for a network wait."
+          }
+        },
+        {
+          "name": "Rates report (plain def — runs in thread pool, ~1s)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/rates/report",
+              "host": ["{{baseUrl}}"],
+              "path": ["rates", "report"]
+            },
+            "description": "Sync work in a plain def runs off the event loop — safe. ~1s."
+          }
+        },
+        {
+          "name": "Bad blocking (FOOTGUN — freezes server ~3s)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/demo/bad-blocking",
+              "host": ["{{baseUrl}}"],
+              "path": ["demo", "bad-blocking"]
+            },
+            "description": "time.sleep inside async def blocks the WHOLE event loop for 3s. Never do this."
+          }
+        }
+      ]
+    }
+  ]
+}
